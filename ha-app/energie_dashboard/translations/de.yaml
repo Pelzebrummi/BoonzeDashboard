@@ -1,0 +1,13 @@
+configuration:
+  strom_statistic_id:
+    name: Statistik Strom
+    description: Statistik-ID des Stromzählers in Home Assistant, z. B. sensor.stromzaehler_bezug. Die verfügbaren IDs zeigt die Seite „HA-Statistiken“ im Dashboard.
+  gas_statistic_id:
+    name: Statistik Gas
+    description: Statistik-ID des Gaszählers in Home Assistant.
+  wasser_statistic_id:
+    name: Statistik Wasser
+    description: Statistik-ID des Wasserzählers in Home Assistant.
+  max_upload_mb:
+    name: Maximale PDF-Größe (MB)
+    description: Größere Dateien werden abgelehnt.

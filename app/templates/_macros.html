@@ -1,0 +1,53 @@
+{# required=False for review rows: unticked empty rows must not block the form; the server validates ticked rows. #}
+{% macro entry_fields(prefix, kinds, media, units, entry=None, required=False) %}
+  <td>
+    <select name="{{ prefix }}kind">
+      {% for key, label in kinds.items() %}
+        <option value="{{ key }}" {% if entry and entry.kind == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </td>
+  <td>
+    <select name="{{ prefix }}medium">
+      {% for key, label in media.items() %}
+        <option value="{{ key }}" {% if entry and entry.medium == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </td>
+  <td><input type="date" name="{{ prefix }}period_start" value="{{ entry.period_start.isoformat() if entry and entry.period_start else '' }}"></td>
+  <td><input type="date" name="{{ prefix }}period_end" value="{{ entry.period_end.isoformat() if entry and entry.period_end else '' }}" {% if required %}required{% endif %}></td>
+  <td><input type="text" inputmode="decimal" name="{{ prefix }}value" value="{{ entry.value | de_number if entry else '' }}" {% if required %}required{% endif %}></td>
+  <td>
+    <select name="{{ prefix }}unit">
+      {% for unit in units %}
+        <option {% if entry and entry.unit == unit %}selected{% endif %}>{{ unit }}</option>
+      {% endfor %}
+    </select>
+  </td>
+  <td><input type="text" name="{{ prefix }}note" value="{{ entry.source if entry and entry.source else '' }}"></td>
+{% endmacro %}
+
+{% macro entry_header() %}
+  <th>Art</th><th>Medium</th><th>von</th><th>bis / am</th><th>Wert</th><th>Einheit</th><th>Notiz</th>
+{% endmacro %}
+
+{% macro entries_table(entries, kinds, media, base, next="/") %}
+  <table>
+    <tr><th>Art</th><th>Medium</th><th>Zeitraum</th><th class="num">Wert</th><th>Notiz</th><th></th></tr>
+    {% for e in entries %}
+      <tr>
+        <td>{{ kinds[e.kind] }}</td>
+        <td>{{ media[e.medium] }}</td>
+        <td>{% if e.period_start %}{{ e.period_start | de_date }} – {% endif %}{{ e.period_end | de_date }}</td>
+        <td class="num">{{ (e.value | de_money) if e.unit == 'EUR' else (e.value | de_number) }} {{ e.unit }}</td>
+        <td class="muted">{{ e.note or '' }}</td>
+        <td>
+          <form class="inline" method="post" action="{{ base }}/entries/{{ e.id }}/delete">
+            <input type="hidden" name="next" value="{{ next }}">
+            <button class="link" type="submit">löschen</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+{% endmacro %}

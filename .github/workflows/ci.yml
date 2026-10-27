@@ -1,0 +1,152 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "*.md"
+      - "homeassistant/**"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Actions are pinned to commit SHAs; Dependabot (.github/dependabot.yml) keeps
+# them current. The deploy job can write packages and branches, so a moved tag
+# must not change what runs there.
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q
+
+      # Build and start the image the way Home Assistant will, so a broken
+      # image never reaches the ha-app branch. The deploy job reuses the cache.
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: energie-dashboard:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Smoke test the image
+        run: |
+          docker run -d --name smoke -p 8099:8099 -e DATA_DIR=/tmp/data energie-dashboard:smoke
+          # Once the app (including database migrations) is up, requests from
+          # outside ingress get 403.
+          for attempt in $(seq 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8099/ || true)
+            [ "$code" = 403 ] && break
+            sleep 1
+          done
+          docker logs smoke
+          docker rm -f smoke
+          [ "$code" = 403 ]
+
+  # Every push to main becomes a release: image to GHCR first, then the new
+  # version on the ha-app branch. Home Assistant picks it up from there.
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    # Queue every deploy in order instead of keeping only one pending run.
+    concurrency:
+      group: deploy-ha-app
+      queue: max
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Version and image name
+        id: meta
+        run: |
+          # CalVer plus run number, e.g. 2026.10.27.42. No commit hash: Home
+          # Assistant would not always recognise such a version as newer.
+          # The run number belongs to this workflow file; renaming the file
+          # restarts it at 1 and the guard below would then block every deploy.
+          echo "version=$(date -u +%Y.%-m.%-d).${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      # Skip visibly when ha-app already has this or a newer run, e.g. when an
+      # old run is re-run. Nothing is built or pushed then.
+      - name: Check the version on ha-app
+        id: guard
+        run: |
+          current=""
+          if git fetch --depth=1 origin ha-app 2>/dev/null; then
+            current=$(git show FETCH_HEAD:energie_dashboard/config.yaml | tr -d '\r' | sed -n 's/^version: "\(.*\)"$/\1/p')
+          fi
+          if [[ -n "$current" && "${current##*.}" -ge "$GITHUB_RUN_NUMBER" ]]; then
+            echo "::warning title=Nicht veröffentlicht::ha-app hat bereits Version $current, dieser Lauf hat die Nummer $GITHUB_RUN_NUMBER."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        if: steps.guard.outputs.publish == 'true'
+
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        if: steps.guard.outputs.publish == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        if: steps.guard.outputs.publish == 'true'
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          build-args: BUILD_VERSION=${{ steps.meta.outputs.version }}
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
+            ${{ steps.meta.outputs.image }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Home Assistant pulls without credentials. If the package is private,
+      # stop here instead of offering an update that cannot be installed.
+      - name: Check that the image can be pulled without login
+        if: steps.guard.outputs.publish == 'true'
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          repo=${IMAGE#ghcr.io/}
+          token=$(curl -fsS "https://ghcr.io/token?scope=repository:${repo}:pull" | jq -r .token) || token=""
+          if ! curl -fsS -o /dev/null \
+            -H "Authorization: Bearer $token" \
+            -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.docker.distribution.manifest.v2+json" \
+            "https://ghcr.io/v2/${repo}/manifests/${VERSION}"; then
+            echo "::error title=Paket nicht öffentlich::$IMAGE:$VERSION ist ohne Anmeldung nicht abrufbar. Auf GitHub das Paket unter Package settings auf Public stellen und diesen Lauf neu starten."
+            exit 1
+          fi
+
+      - name: Publish app definition to the ha-app branch
+        if: steps.guard.outputs.publish == 'true'
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          IMAGE: ${{ steps.meta.outputs.image }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          subject=$(printf '%s\n' "${COMMIT_MESSAGE:-Manuell gestartet}" | head -n 1)
+          bash scripts/publish-ha-app.sh "$VERSION" "$IMAGE" "$REPO_URL" "$subject (${GITHUB_SHA::7})"

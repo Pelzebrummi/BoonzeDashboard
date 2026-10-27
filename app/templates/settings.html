@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>HA-Statistiken</h1>
+
+<section>
+  <h2>Zugeordnet</h2>
+  {% if statistic_ids %}
+    <table>
+      {% for medium, statistic_id in statistic_ids.items() %}
+        <tr><td>{{ media[medium] }}</td><td><code>{{ statistic_id }}</code></td></tr>
+      {% endfor %}
+    </table>
+  {% else %}
+    <p class="muted">Noch nichts zugeordnet.</p>
+  {% endif %}
+  <p class="muted">
+    Ändern unter Einstellungen → Apps → Energie Dashboard → Konfiguration, danach die App neu starten.
+  </p>
+</section>
+
+<section>
+  <h2>Verfügbare Zähler-Statistiken in Home Assistant</h2>
+  {% if ha_error %}
+    <p class="bad">{{ ha_error }}</p>
+  {% elif available %}
+    <table>
+      <tr><th>Statistik-ID</th><th>Name</th><th>Einheit</th></tr>
+      {% for s in available %}
+        <tr>
+          <td><code>{{ s.statistic_id }}</code></td>
+          <td>{{ s.name or '' }}</td>
+          <td>{{ s.statistics_unit_of_measurement or '' }}</td>
+        </tr>
+      {% endfor %}
+    </table>
+  {% else %}
+    <p class="muted">Home Assistant meldet keine Statistiken mit Summe. Zähler-Sensoren brauchen <code>state_class: total_increasing</code> oder <code>total</code>.</p>
+  {% endif %}
+</section>
+{% endblock %}

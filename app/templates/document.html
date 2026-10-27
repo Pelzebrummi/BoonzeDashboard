@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% from "_macros.html" import entry_fields, entry_header, entries_table %}
+{% block title %}{{ doc.filename }} – Energie Dashboard{% endblock %}
+{% block content %}
+<h1>{{ doc.filename }}</h1>
+
+{% if duplicate %}
+  <section class="notice"><p>Diese Datei wurde bereits hochgeladen. Hier ist das vorhandene Dokument.</p></section>
+{% endif %}
+
+<section>
+  <p>
+    {{ doc.page_count }} Seite(n), hochgeladen am {{ doc.uploaded_at[:10] | de_date }}{% if doc.uploaded_by %} von {{ doc.uploaded_by }}{% endif %}.
+    <a href="{{ base }}/documents/{{ doc.id }}/pdf" target="_blank" rel="noopener">PDF öffnen</a>
+  </p>
+  {% if not doc.text.strip() %}
+    <p class="bad">Die PDF enthält keinen Text (vermutlich ein Scan). Bitte die Werte unten von Hand eintragen.</p>
+  {% endif %}
+</section>
+
+{% if entries %}
+<section>
+  <h2>Gespeicherte Einträge aus diesem Dokument</h2>
+  {{ entries_table(entries, kinds, media, base, next="/documents/" ~ doc.id) }}
+</section>
+{% endif %}
+
+<section>
+  <h2>Werte prüfen und übernehmen</h2>
+  <p class="muted">
+    Vorlage: {{ template.name }}. Nur angehakte Zeilen werden gespeichert.
+    Zählerstand: nur „bis / am“ ausfüllen. Abbuchung: nur „bis / am“ ausfüllen. Verbrauch und Rechnungsbetrag: Zeitraum angeben.
+    Pro Rechnung nur einen Betrag mit Zeitraum anhaken (die Kosten), sonst werden sie doppelt gezählt.
+  </p>
+  {% if entries %}
+    <p class="bad">Aus diesem Dokument sind schon Einträge gespeichert, deshalb ist nichts vorausgewählt.</p>
+  {% endif %}
+  <form method="post" action="{{ base }}/documents/{{ doc.id }}/entries">
+    <table>
+      <tr><th>✓</th>{{ entry_header() }}</tr>
+      {% for s in suggestions %}
+        <tr>
+          <td><input type="checkbox" name="rows-{{ loop.index0 }}-use" {% if s.checked and not entries %}checked{% endif %}></td>
+          {{ entry_fields("rows-" ~ loop.index0 ~ "-", kinds, media, units, s) }}
+        </tr>
+      {% endfor %}
+      {% for i in range(empty_rows) %}
+        {% set index = suggestions | length + i %}
+        <tr>
+          <td><input type="checkbox" name="rows-{{ index }}-use"></td>
+          {{ entry_fields("rows-" ~ index ~ "-", kinds, media, units) }}
+        </tr>
+      {% endfor %}
+    </table>
+    <p><button type="submit">Angehakte Zeilen speichern</button></p>
+  </form>
+</section>
+
+<section>
+  <h2>Ausgelesener Text</h2>
+  <details>
+    <summary>anzeigen</summary>
+    <pre>{{ doc.text }}</pre>
+  </details>
+</section>
+
+<section>
+  <form method="post" action="{{ base }}/documents/{{ doc.id }}/delete" onsubmit="return confirm('Dokument löschen? Die Einträge bleiben erhalten.');">
+    <button class="link" type="submit">Dokument löschen</button>
+  </form>
+</section>
+{% endblock %}

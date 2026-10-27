@@ -1,0 +1,40 @@
+# Template. scripts/publish-ha-app.sh fills in __VERSION__, __IMAGE__ and
+# __REPO_URL__ and publishes the result on the ha-app branch.
+#
+# Do not change `slug` (or the repository URL / branch) once the app is
+# installed: Home Assistant would treat it as a different app with an empty
+# /data, and the update entity used by the deploy automation would change.
+name: Energie Dashboard
+version: "__VERSION__"
+slug: energie_dashboard
+description: Rechnungen und Zählerstände aus PDFs mit dem Verbrauch in Home Assistant vergleichen
+url: __REPO_URL__
+arch:
+  - amd64
+image: __IMAGE__
+startup: application
+boot: auto
+ingress: true
+ingress_port: 8099
+# Stream uploads to the app instead of buffering them in the Supervisor
+# (which limits buffered bodies to 16 MiB).
+ingress_stream: true
+panel_icon: mdi:file-chart-outline
+panel_title: Energie
+panel_admin: true
+homeassistant_api: true
+# Used once "Watchdog" is switched on in the app's Info tab (off by default):
+# the Supervisor then restarts the app if it crashes or stops answering.
+watchdog: "http://[HOST]:[PORT:8099]/healthz"
+# Stop the app during backups so the SQLite database is copied consistently.
+backup: cold
+options:
+  strom_statistic_id: ""
+  gas_statistic_id: ""
+  wasser_statistic_id: ""
+  max_upload_mb: 20
+schema:
+  strom_statistic_id: str?
+  gas_statistic_id: str?
+  wasser_statistic_id: str?
+  max_upload_mb: int(1,100)

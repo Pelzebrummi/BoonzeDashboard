@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% from "_macros.html" import entries_table %}
+{% block content %}
+<h1>Übersicht</h1>
+
+<section>
+  <h2>Verbrauch: Rechnung gegenüber Home Assistant</h2>
+  {% if ha_error %}<p class="bad">{{ ha_error }}</p>{% endif %}
+  {% if not statistic_ids %}
+    <p class="muted">Noch keine HA-Statistik zugeordnet. Die IDs stehen unter „HA-Statistiken“ und werden in der App-Konfiguration eingetragen.</p>
+  {% endif %}
+  {% if comparisons %}
+    <table>
+      <tr>
+        <th>Medium</th><th>Zeitraum</th><th class="num">Rechnung</th><th class="num">Home Assistant</th>
+        <th class="num">Abweichung</th><th class="num">Kosten laut Rechnung</th><th class="num">Preis je Einheit</th>
+        <th class="num">Abbuchungen im Zeitraum</th>
+      </tr>
+      {% for row in comparisons %}
+        {% set e = row.entry %}
+        <tr>
+          <td>{{ media[e.medium] }}</td>
+          <td>{{ e.period_start | de_date }} – {{ e.period_end | de_date }}</td>
+          <td class="num">{{ e.value | de_number }} {{ e.unit }}</td>
+          <td class="num">
+            {% if row.ha and row.ha.change is not none %}{{ row.ha.change | de_number }} {{ row.ha.unit or '' }}
+              {% if not row.ha.covered %}<br><span class="muted">HA misst erst seit diesem Zeitraum, Wert unvollständig</span>{% endif %}
+            {% elif statistic_ids.get(e.medium) %}<span class="muted">keine Daten</span>
+            {% else %}<span class="muted">nicht zugeordnet</span>{% endif %}
+          </td>
+          <td class="num">
+            {% if row.deviation is not none %}
+              <span class="{{ 'good' if row.deviation | abs < 5 else 'bad' }}">{{ row.deviation | de_number(1) }} %</span>
+            {% endif %}
+          </td>
+          <td class="num">
+            {% if row.billed %}{{ row.billed | de_money }} €{% endif %}
+            {% if row.billed_count > 1 %}<br><span class="bad">Summe aus {{ row.billed_count }} Beträgen, bitte prüfen</span>{% endif %}
+          </td>
+          <td class="num">{% if row.price %}{{ row.price | de_number(4) }} €/{{ e.unit }}{% endif %}</td>
+          <td class="num">{% if row.debited %}{{ row.debited | de_money }} €{% endif %}</td>
+        </tr>
+      {% endfor %}
+    </table>
+  {% else %}
+    <p class="muted">Noch kein Verbrauch erfasst. Lade eine Rechnung hoch oder erfasse einen Eintrag von Hand.</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Alle Einträge</h2>
+  {% if entries %}{{ entries_table(entries, kinds, media, base) }}{% else %}<p class="muted">Keine Einträge.</p>{% endif %}
+</section>
+
+<section>
+  <h2>Dokumente</h2>
+  {% if documents %}
+    <table>
+      <tr><th>Datei</th><th>Hochgeladen</th><th class="num">Seiten</th><th class="num">Einträge</th></tr>
+      {% for d in documents %}
+        <tr>
+          <td><a href="{{ base }}/documents/{{ d.id }}">{{ d.filename }}</a></td>
+          <td>{{ d.uploaded_at[:10] | de_date }}{% if d.uploaded_by %} <span class="muted">({{ d.uploaded_by }})</span>{% endif %}</td>
+          <td class="num">{{ d.page_count }}</td>
+          <td class="num">{{ d.entry_count }}</td>
+        </tr>
+      {% endfor %}
+    </table>
+  {% else %}
+    <p class="muted">Noch keine PDFs hochgeladen.</p>
+  {% endif %}
+</section>
+{% endblock %}

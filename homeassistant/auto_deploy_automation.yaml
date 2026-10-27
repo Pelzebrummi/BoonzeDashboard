@@ -1,0 +1,62 @@
+# Einmalig in Home Assistant anlegen:
+# Einstellungen → Automationen & Szenen → Automation erstellen → ⋮ → In YAML bearbeiten,
+# diesen Inhalt einfügen und speichern.
+#
+# Alle 10 Minuten:
+# 1. Die App starten, falls sie nicht läuft. Eine App, die abgestürzt ist,
+#    startet der Supervisor nach einem Update nicht von selbst neu. Ohne diesen
+#    Schritt bliebe sie nach einem fehlerhaften Release auch mit dem
+#    korrigierten Release aus. Läuft die App, passiert nichts.
+#    Folge: Eine absichtlich gestoppte App startet hier wieder. Zum Abschalten
+#    die Automation deaktivieren.
+# 2. Nach einer neuen Version schauen und sie ohne Backup installieren (das
+#    App-Backup würde bei jedem Deploy alle PDFs erneut sichern).
+#
+# Hinweis: Dass homeassistant.update_entity auf der Update-Entity einer App
+# den App Store neu lädt, ist Verhalten von HA 2026.10 laut Quellcode, keine
+# dokumentierte Schnittstelle. Falls es in einer späteren Version nicht mehr
+# greift, findet HA neue Versionen trotzdem beim regulären Store-Reload
+# (alle 3 Stunden).
+alias: Energie Dashboard automatisch aktualisieren
+description: Hält die Energie-Dashboard-App am Laufen und installiert neue Versionen kurz nach dem Commit auf main.
+mode: single
+max_exceeded: silent
+triggers:
+  - trigger: time_pattern
+    minutes: "/10"
+  - trigger: homeassistant
+    event: start
+variables:
+  update_entity: update.energie_dashboard_update
+  # Der App-Slug (z. B. 1a2b3c4d_energie_dashboard) steht in der Geräte-Kennung
+  # der Update-Entity, deshalb muss er hier nicht eingetragen werden.
+  app_slug: >-
+    {% set ids = device_attr(device_id(update_entity), 'identifiers') or [] %}
+    {{ ids | selectattr('0', 'eq', 'hassio') | map(attribute='1') | first | default('') }}
+actions:
+  - if: "{{ app_slug != '' }}"
+    then:
+      - action: hassio.app_start
+        continue_on_error: true
+        data:
+          app: "{{ app_slug }}"
+  - action: homeassistant.update_entity
+    target:
+      entity_id: "{{ update_entity }}"
+  # "on" heißt: die angebotene Version ist neuer als die installierte.
+  # Damit wird nie auf eine ältere Version zurückgegangen.
+  - wait_template: >-
+      {{ is_state(update_entity, 'on') and not state_attr(update_entity, 'in_progress') }}
+    timeout: "00:03:00"
+    continue_on_timeout: false
+  - action: update.install
+    target:
+      entity_id: "{{ update_entity }}"
+    data:
+      backup: false
+  - if: "{{ app_slug != '' }}"
+    then:
+      - action: hassio.app_start
+        continue_on_error: true
+        data:
+          app: "{{ app_slug }}"

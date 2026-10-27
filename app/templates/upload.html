@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>PDF hochladen</h1>
+<section>
+  <form method="post" action="{{ base }}/upload" enctype="multipart/form-data">
+    <p><input type="file" name="file" accept="application/pdf,.pdf" required></p>
+    <p class="muted">
+      Rechnungen, Abschlagspläne oder Zählerstands-Mitteilungen als PDF, höchstens {{ max_upload_mb }} MB.
+      Die Werte werden danach vorgeschlagen und vor dem Speichern geprüft.
+      Kontobewegungen lassen sich zuverlässiger als CSV-Export aus dem Online-Banking übernehmen als aus einem Kontoauszug-PDF.
+    </p>
+    <button type="submit">Hochladen</button>
+  </form>
+</section>
+{% endblock %}

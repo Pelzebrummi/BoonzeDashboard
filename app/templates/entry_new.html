@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "_macros.html" import entry_fields, entry_header %}
+{% block content %}
+<h1>Eintrag erfassen</h1>
+<section>
+  <p class="muted">
+    Zum Beispiel einen abgelesenen Zählerstand (nur „bis / am“) oder eine Abbuchung vom Konto (nur „bis / am“).
+    Ein Verbrauch braucht einen Zeitraum.
+  </p>
+  <form method="post" action="{{ base }}/entries">
+    <table>
+      <tr>{{ entry_header() }}</tr>
+      <tr>{{ entry_fields("", kinds, media, units, required=True) }}</tr>
+    </table>
+    <p><button type="submit">Speichern</button></p>
+  </form>
+</section>
+{% endblock %}

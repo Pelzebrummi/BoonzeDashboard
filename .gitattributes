@@ -1,0 +1,5 @@
+# The deploy script and YAML run on Linux runners and in Home Assistant;
+# CRLF line endings would break them there without any sign on Windows.
+* text=auto eol=lf
+*.pdf binary
+*.png binary

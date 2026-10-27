@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Das hat nicht geklappt</h1>
+<section class="error">
+  <p>{{ message }}</p>
+  <p><a href="javascript:history.back()">Zurück</a> · <a href="{{ base }}/">Zur Übersicht</a></p>
+</section>
+{% endblock %}

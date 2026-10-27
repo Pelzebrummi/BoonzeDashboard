@@ -1,0 +1,4 @@
+# Rendered by scripts/publish-ha-app.sh onto the ha-app branch.
+# Home Assistant reads this branch: https://github.com/<owner>/<repo>#ha-app
+name: Boonze Apps
+url: __REPO_URL__
