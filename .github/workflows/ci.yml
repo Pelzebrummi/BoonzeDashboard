@@ -42,7 +42,8 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Smoke test the image
         run: |
-          docker run -d --name smoke -p 8099:8099 -e DATA_DIR=/tmp/data energie-dashboard:smoke
+          # --init like Home Assistant apps (init: true), so SIGTERM behaves the same.
+          docker run -d --init --name smoke -p 8099:8099 -e DATA_DIR=/tmp/data energie-dashboard:smoke
           # Once the app (including database migrations) is up, requests from
           # outside ingress get 403.
           for attempt in $(seq 30); do
@@ -50,9 +51,13 @@ jobs:
             [ "$code" = 403 ] && break
             sleep 1
           done
+          # The Supervisor stops apps with SIGTERM and warns unless they exit with 0.
+          docker stop smoke
+          exit_code=$(docker inspect smoke --format '{{.State.ExitCode}}')
           docker logs smoke
-          docker rm -f smoke
-          [ "$code" = 403 ]
+          docker rm smoke
+          echo "HTTP: $code, exit code after SIGTERM: $exit_code"
+          [ "$code" = 403 ] && [ "$exit_code" = 0 ]
 
   # Every push to main becomes a release: image to GHCR first, then the new
   # version on the ha-app branch. Home Assistant picks it up from there.
