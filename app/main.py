@@ -6,11 +6,13 @@ built from ``base`` (see ``render`` and ``redirect``), never from a bare "/".
 """
 
 import hashlib
+import os
 import re
 import secrets
 import sqlite3
 from contextlib import asynccontextmanager, closing
 from datetime import date, datetime, time, timedelta
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -18,6 +20,7 @@ from zoneinfo import ZoneInfo
 from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import FormData
@@ -30,12 +33,25 @@ from app.ha import HAError, HomeAssistant, PeriodQuery
 from app.parsing import parse_german_number, suggest_entries
 from app.pdf.extract import ExtractionError, extract_text
 
-TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
+APP_DIR = Path(__file__).parent
+TEMPLATES = Jinja2Templates(directory=APP_DIR / "templates")
 INGRESS_PATH = re.compile(r"^/api/hassio_ingress/[A-Za-z0-9_-]+$")
 SAFE_NEXT = re.compile(r"^/(documents/\d+)?$")
 CHUNK_SIZE = 1024 * 1024
 FORM_OVERHEAD = 1024 * 1024
 EMPTY_ROWS = 2
+# Appended to stylesheet URLs so a new release is not served from the browser cache.
+ASSET_VERSION = os.environ.get("APP_VERSION", "dev")
+
+# Deviation of the measured from the billed consumption, in percent (design system: StatusPill).
+STATUS_OK_PERCENT = 5.0
+STATUS_WARN_PERCENT = 15.0
+STATUS_LABELS = {
+    "ok": ("✓", "passt"),
+    "warn": ("!", "prüfen"),
+    "bad": ("×", "weicht ab"),
+    "none": ("–", "unvollständig"),
+}
 
 
 def _de_date(value: str | date | None) -> str:
@@ -46,20 +62,59 @@ def _de_date(value: str | date | None) -> str:
     return value.strftime("%d.%m.%Y")
 
 
+def _german_separators(text: str) -> str:
+    return text.replace(",", "\0").replace(".", ",").replace("\0", ".")
+
+
 def _de_number(value: float | None, digits: int = 3) -> str:
+    """Display format with thousands separators: 2111 -> '2.111', 0.38484 -> '0,3848' (digits=4)."""
     if value is None:
         return ""
-    text = f"{value:.{digits}f}".rstrip("0").rstrip(".")
-    return text.replace(".", ",")
+    # "z" turns a value that rounds to zero into 0 instead of -0.
+    text = f"{value:z,.{digits}f}"
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return _german_separators(text).replace("-", "−")
+
+
+def _de_input(value: float | None, unit: str | None = None) -> str:
+    """Form field format without thousands separators, so '1.234' is never ambiguous: 2111.5 -> '2111,5'.
+
+    Euro amounts keep two decimals: 812.4 -> '812,40'.
+    """
+    if value is None:
+        return ""
+    if unit == "EUR":
+        return f"{value:z.2f}".replace(".", ",")
+    return f"{value:z.3f}".rstrip("0").rstrip(".").replace(".", ",")
 
 
 def _de_money(value: float | None) -> str:
-    return "" if value is None else f"{value:.2f}".replace(".", ",")
+    return "" if value is None else _german_separators(f"{value:z,.2f}").replace("-", "−")
 
 
 TEMPLATES.env.filters["de_date"] = _de_date
 TEMPLATES.env.filters["de_number"] = _de_number
+TEMPLATES.env.filters["de_input"] = _de_input
 TEMPLATES.env.filters["de_money"] = _de_money
+
+
+def classify_deviation(deviation: float) -> str:
+    # Rounded like the percentage in verdict_text, so pill and sentence never disagree (5,0 % is "passt").
+    size = round(abs(deviation), 1)
+    if size <= STATUS_OK_PERCENT:
+        return "ok"
+    if size <= STATUS_WARN_PERCENT:
+        return "warn"
+    return "bad"
+
+
+def verdict_text(deviation: float) -> str:
+    size = abs(deviation)
+    if round(size, 1) == 0:
+        return "Messung und Rechnung stimmen überein."
+    direction = "weniger" if deviation < 0 else "mehr"
+    return f"Home Assistant hat {_de_number(size, 1)} % {direction} gemessen als abgerechnet."
 
 
 class BodySizeLimit:
@@ -101,6 +156,22 @@ def current_user(request: Request) -> str | None:
     return request.headers.get("X-Remote-User-Name") or None
 
 
+NAV_PAGES = frozenset({"/", "/upload", "/entries/new", "/settings"})
+
+
+def nav_section(path: str) -> str:
+    """Which navigation entry is current; documents belong to the overview."""
+    for prefix, section in (("/upload", "upload"), ("/entries/new", "entry"), ("/settings", "settings")):
+        if path.startswith(prefix):
+            return section
+    return "overview"
+
+
+def nav_current(path: str) -> str:
+    """aria-current value: "page" on the section's own page, "true" on pages inside it (a document)."""
+    return "page" if path in NAV_PAGES else "true"
+
+
 def render(
     request: Request, name: str, context: dict[str, Any] | None = None, status_code: int = 200
 ) -> Response:
@@ -109,6 +180,10 @@ def render(
         name,
         {
             "base": ingress_base(request),
+            "nav": nav_section(request.url.path),
+            "nav_current": nav_current(request.url.path),
+            "asset_version": ASSET_VERSION,
+            "status_labels": STATUS_LABELS,
             "user": request.headers.get("X-Remote-User-Display-Name") or current_user(request),
             "kinds": db.KINDS,
             "media": db.MEDIA_LABELS,
@@ -151,6 +226,9 @@ def parse_entry(
         raise HTTPException(400, "Ein Zählerstand hat nur ein Datum (bis).")
     if start and start > end:
         raise HTTPException(400, "Der Zeitraum beginnt nach seinem Ende.")
+    # Otherwise a Betrag in kWh would be summed as euros into the card's costs.
+    if (kind == "betrag") != (unit == "EUR"):
+        raise HTTPException(400, "Ein Betrag steht in EUR, ein Verbrauch oder Zählerstand in kWh oder m³.")
     try:
         number = parse_german_number(value)
     except ValueError as exc:
@@ -200,6 +278,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(title="Energie Dashboard", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(BodySizeLimit, max_bytes=settings.max_upload_bytes + FORM_OVERHEAD)
+    app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
 
     @app.middleware("http")
     async def only_through_ingress(request: Request, call_next):
@@ -211,14 +290,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(StarletteHTTPException)
     async def show_error(request: Request, exc: StarletteHTTPException) -> Response:
-        return render(request, "error.html", {"message": exc.detail}, status_code=exc.status_code)
+        message = exc.detail
+        # Starlette's own errors carry the English status phrase ("Not Found").
+        if message == HTTPStatus(exc.status_code).phrase:
+            message = {404: "Diese Seite gibt es nicht.", 405: "Diese Aktion ist hier nicht möglich."}.get(
+                exc.status_code, "Die Anfrage konnte nicht bearbeitet werden."
+            )
+        return render(request, "error.html", {"message": message}, status_code=exc.status_code)
 
     @app.exception_handler(RequestValidationError)
     async def show_validation_error(request: Request, exc: RequestValidationError) -> Response:
         return render(
             request,
             "error.html",
-            {"message": "Ungültige Anfrage. Bitte das Formular noch einmal ausfüllen und absenden."},
+            {"message": "Ungültige Anfrage. Füll das Formular noch einmal aus und sende es ab."},
             status_code=422,
         )
 
@@ -275,7 +360,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 and change.covered
                 and change.change is not None
                 and change.unit == entry["unit"]
-                and entry["value"]
+                and entry["value"] > 0
             ):
                 deviation = (change.change - entry["value"]) / entry["value"] * 100
             same_medium = [a for a in amounts if a["medium"] == entry["medium"]]
@@ -291,15 +376,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 for a in same_medium
                 if a["period_start"] is None and entry["period_start"] <= a["period_end"] <= entry["period_end"]
             )
+            status, status_label, verdict = None, None, None
+            if deviation is not None:
+                status = classify_deviation(deviation)
+                verdict = verdict_text(deviation)
+            elif settings.statistic_ids.get(entry["medium"]) and not ha_error:
+                status = "none"
+                if change is None or change.change is None:
+                    verdict = "Home Assistant hat für diesen Zeitraum keine Werte."
+                elif not change.covered:
+                    verdict = "Home Assistant hat diesen Zeitraum nicht vollständig gemessen."
+                elif change.unit != entry["unit"]:
+                    status_label = "nicht vergleichbar"
+                    measured = f"misst in {change.unit}" if change.unit else "nennt keine Einheit"
+                    verdict = f"Home Assistant {measured}, die Rechnung nennt {entry['unit']}."
+                else:
+                    status_label = "nicht vergleichbar"
+                    verdict = (
+                        f"Die Rechnung nennt {_de_number(entry['value'])} {entry['unit']}, "
+                        "daraus lässt sich keine Abweichung berechnen."
+                    )
             rows.append(
                 {
                     "entry": entry,
                     "ha": change,
                     "deviation": deviation,
+                    "status": status,
+                    "status_label": status_label,
+                    "verdict": verdict,
                     "billed": sum(billed) if billed else None,
                     "billed_count": len(billed),
                     "debited": debited or None,
-                    "price": sum(billed) / entry["value"] if billed and entry["value"] else None,
+                    "price": sum(billed) / entry["value"] if billed and entry["value"] > 0 else None,
                 }
             )
         return rows, ha_error

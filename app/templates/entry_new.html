@@ -1,18 +1,42 @@
 {% extends "base.html" %}
-{% from "_macros.html" import entry_fields, entry_header %}
+{% block title %}Eintrag erfassen – Boonze Dashboard{% endblock %}
 {% block content %}
-<h1>Eintrag erfassen</h1>
-<section>
-  <p class="muted">
-    Zum Beispiel einen abgelesenen Zählerstand (nur „bis / am“) oder eine Abbuchung vom Konto (nur „bis / am“).
-    Ein Verbrauch braucht einen Zeitraum.
-  </p>
-  <form method="post" action="{{ base }}/entries">
-    <table>
-      <tr>{{ entry_header() }}</tr>
-      <tr>{{ entry_fields("", kinds, media, units, required=True) }}</tr>
-    </table>
-    <p><button type="submit">Speichern</button></p>
-  </form>
-</section>
+<header class="bz-page-head">
+  <h1 class="bz-display">Eintrag erfassen</h1>
+  <p class="bz-empty">Ein abgelesener Zählerstand oder eine Abbuchung hat nur ein Datum, ein Verbrauch einen Zeitraum.</p>
+</header>
+<form class="bz-form bz-card" method="post" action="{{ base }}/entries">
+  <div class="bz-fields">
+    <label class="bz-field"><span class="bz-label">Art</span>
+      <select class="bz-input" name="kind" id="kind">
+        {% for key, label in kinds.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="bz-field"><span class="bz-label">Medium</span>
+      <select class="bz-input" name="medium" id="medium">
+        {% for key, label in media.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="bz-field"><span class="bz-label">Zeitraum von</span>
+      <input class="bz-input" type="date" name="period_start" id="period_start">
+      <span class="bz-field__hint">Leer lassen bei Zählerstand und Abbuchung.</span>
+    </label>
+    <label class="bz-field"><span class="bz-label">Bis / am</span>
+      <input class="bz-input" type="date" name="period_end" id="period_end" required>
+    </label>
+    <label class="bz-field"><span class="bz-label">Wert</span>
+      <input class="bz-input bz-input--figure" type="text" inputmode="decimal" name="value" id="value" required>
+      <span class="bz-field__hint">Mit Komma, zum Beispiel 812,40.</span>
+    </label>
+    <label class="bz-field"><span class="bz-label">Einheit</span>
+      <select class="bz-input" name="unit" id="unit">
+        {% for unit in units %}<option>{{ unit }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="bz-field"><span class="bz-label">Notiz</span>
+      <input class="bz-input" type="text" name="note" id="note">
+    </label>
+  </div>
+  <div class="bz-actions"><button class="bz-btn bz-btn--primary" type="submit">Eintrag speichern</button></div>
+</form>
 {% endblock %}

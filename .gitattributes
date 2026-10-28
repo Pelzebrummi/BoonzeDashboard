@@ -2,4 +2,5 @@
 # CRLF line endings would break them there without any sign on Windows.
 * text=auto eol=lf
 *.pdf binary
+*.woff2 binary
 *.png binary

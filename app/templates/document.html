@@ -1,72 +1,79 @@
 {% extends "base.html" %}
-{% from "_macros.html" import entry_fields, entry_header, entries_table %}
-{% block title %}{{ doc.filename }} – Energie Dashboard{% endblock %}
+{% from "_macros.html" import entry_fields, entry_header, entries_table with context %}
+{% block title %}{{ doc.filename }} – Boonze Dashboard{% endblock %}
 {% block content %}
-<h1>{{ doc.filename }}</h1>
+<header class="bz-page-head">
+  <h1 class="bz-display">{{ doc.filename }}</h1>
+  <p class="bz-empty bz-small">
+    {{ doc.page_count }} Seite(n), hochgeladen am {{ doc.uploaded_at[:10] | de_date }}{% if doc.uploaded_by %} von {{ doc.uploaded_by }}{% endif %}.
+    <a class="bz-link" href="{{ base }}/documents/{{ doc.id }}/pdf" target="_blank" rel="noopener">PDF öffnen</a>
+  </p>
+</header>
 
 {% if duplicate %}
-  <section class="notice"><p>Diese Datei wurde bereits hochgeladen. Hier ist das vorhandene Dokument.</p></section>
+  <div class="bz-notice bz-notice--info"><span class="bz-notice__sign" aria-hidden="true">i</span><p>Diese Datei wurde schon hochgeladen. Hier ist das vorhandene Dokument.</p></div>
 {% endif %}
-
-<section>
-  <p>
-    {{ doc.page_count }} Seite(n), hochgeladen am {{ doc.uploaded_at[:10] | de_date }}{% if doc.uploaded_by %} von {{ doc.uploaded_by }}{% endif %}.
-    <a href="{{ base }}/documents/{{ doc.id }}/pdf" target="_blank" rel="noopener">PDF öffnen</a>
-  </p>
-  {% if not doc.text.strip() %}
-    <p class="bad">Die PDF enthält keinen Text (vermutlich ein Scan). Bitte die Werte unten von Hand eintragen.</p>
-  {% endif %}
-</section>
+{% if not doc.text.strip() %}
+  <div class="bz-notice bz-notice--warn"><span class="bz-notice__sign" aria-hidden="true">!</span><p>Die PDF enthält keinen Text, vermutlich ist sie gescannt. Trag die Werte unten von Hand ein.</p></div>
+{% endif %}
 
 {% if entries %}
-<section>
-  <h2>Gespeicherte Einträge aus diesem Dokument</h2>
-  {{ entries_table(entries, kinds, media, base, next="/documents/" ~ doc.id) }}
+<section class="bz-section" aria-labelledby="saved-title">
+  <h2 class="bz-title" id="saved-title">Gespeicherte Einträge aus diesem Dokument</h2>
+  {{ entries_table(entries, next="/documents/" ~ doc.id) }}
 </section>
 {% endif %}
 
-<section>
-  <h2>Werte prüfen und übernehmen</h2>
-  <p class="muted">
+<section class="bz-section" aria-labelledby="review-title">
+  <h2 class="bz-title" id="review-title">Werte prüfen und übernehmen</h2>
+  <p class="bz-empty bz-small">
     Vorlage: {{ template.name }}. Nur angehakte Zeilen werden gespeichert.
-    Zählerstand: nur „bis / am“ ausfüllen. Abbuchung: nur „bis / am“ ausfüllen. Verbrauch und Rechnungsbetrag: Zeitraum angeben.
+    Zählerstand und Abbuchung haben nur ein Datum („Bis / am“), Verbrauch und Rechnungsbetrag einen Zeitraum.
     Pro Rechnung nur einen Betrag mit Zeitraum anhaken (die Kosten), sonst werden sie doppelt gezählt.
   </p>
   {% if entries %}
-    <p class="bad">Aus diesem Dokument sind schon Einträge gespeichert, deshalb ist nichts vorausgewählt.</p>
+    <div class="bz-notice bz-notice--warn"><span class="bz-notice__sign" aria-hidden="true">!</span><p>Aus diesem Dokument sind schon Einträge gespeichert, deshalb ist nichts vorausgewählt.</p></div>
   {% endif %}
-  <form method="post" action="{{ base }}/documents/{{ doc.id }}/entries">
-    <table>
-      <tr><th>✓</th>{{ entry_header() }}</tr>
-      {% for s in suggestions %}
-        <tr>
-          <td><input type="checkbox" name="rows-{{ loop.index0 }}-use" {% if s.checked and not entries %}checked{% endif %}></td>
-          {{ entry_fields("rows-" ~ loop.index0 ~ "-", kinds, media, units, s) }}
-        </tr>
-      {% endfor %}
-      {% for i in range(empty_rows) %}
-        {% set index = suggestions | length + i %}
-        <tr>
-          <td><input type="checkbox" name="rows-{{ index }}-use"></td>
-          {{ entry_fields("rows-" ~ index ~ "-", kinds, media, units) }}
-        </tr>
-      {% endfor %}
-    </table>
-    <p><button type="submit">Angehakte Zeilen speichern</button></p>
+  <form class="bz-form" method="post" action="{{ base }}/documents/{{ doc.id }}/entries">
+    <div class="bz-ledger-wrap">
+      <table class="bz-ledger bz-ledger--form">
+        <thead><tr><th><span aria-hidden="true">✓</span><span class="bz-sr">Übernehmen</span></th>{{ entry_header() }}</tr></thead>
+        <tbody>
+          {% for s in suggestions %}
+            <tr>
+              <td data-label="Übernehmen"><input type="checkbox" name="rows-{{ loop.index0 }}-use" id="rows-{{ loop.index0 }}-use" aria-label="Zeile übernehmen" {% if s.checked and not entries %}checked{% endif %}></td>
+              {{ entry_fields("rows-" ~ loop.index0 ~ "-", s) }}
+            </tr>
+          {% endfor %}
+          {% for i in range(empty_rows) %}
+            {% set index = suggestions | length + i %}
+            <tr>
+              <td data-label="Übernehmen"><input type="checkbox" name="rows-{{ index }}-use" id="rows-{{ index }}-use" aria-label="Zeile übernehmen"></td>
+              {{ entry_fields("rows-" ~ index ~ "-") }}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="bz-actions"><button class="bz-btn bz-btn--primary" type="submit">Angehakte Zeilen speichern</button></div>
   </form>
 </section>
 
-<section>
-  <h2>Ausgelesener Text</h2>
+<section class="bz-section" aria-labelledby="text-title">
+  <h2 class="bz-title" id="text-title">Ausgelesener Text</h2>
   <details>
-    <summary>anzeigen</summary>
-    <pre>{{ doc.text }}</pre>
+    <summary>Text anzeigen</summary>
+    <pre class="bz-pre">{{ doc.text }}</pre>
   </details>
 </section>
 
-<section>
-  <form method="post" action="{{ base }}/documents/{{ doc.id }}/delete" onsubmit="return confirm('Dokument löschen? Die Einträge bleiben erhalten.');">
-    <button class="link" type="submit">Dokument löschen</button>
-  </form>
+<section class="bz-section">
+  <details class="bz-confirm">
+    <summary class="bz-btn bz-btn--danger">Dokument löschen</summary>
+    <form class="bz-confirm__body" method="post" action="{{ base }}/documents/{{ doc.id }}/delete">
+      <p class="bz-small">Die PDF wird endgültig gelöscht. Die Einträge daraus bleiben erhalten.</p>
+      <button class="bz-btn bz-btn--danger" type="submit">Ja, Dokument endgültig löschen</button>
+    </form>
+  </details>
 </section>
 {% endblock %}

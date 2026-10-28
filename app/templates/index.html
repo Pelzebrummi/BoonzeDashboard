@@ -1,73 +1,106 @@
 {% extends "base.html" %}
-{% from "_macros.html" import entries_table %}
+{% from "_macros.html" import status_pill, medium_chip, period, entries_table with context %}
 {% block content %}
-<h1>Übersicht</h1>
+<header class="bz-page-head">
+  <h1 class="bz-display">Übersicht</h1>
+  <p class="bz-empty">Rechnungen und Zählerstände im Vergleich mit dem, was Home Assistant gemessen hat.</p>
+</header>
 
-<section>
-  <h2>Verbrauch: Rechnung gegenüber Home Assistant</h2>
-  {% if ha_error %}<p class="bad">{{ ha_error }}</p>{% endif %}
-  {% if not statistic_ids %}
-    <p class="muted">Noch keine HA-Statistik zugeordnet. Die IDs stehen unter „HA-Statistiken“ und werden in der App-Konfiguration eingetragen.</p>
-  {% endif %}
+{% if ha_error %}
+  <div class="bz-notice bz-notice--error"><span class="bz-notice__sign" aria-hidden="true">×</span><p>{{ ha_error }}</p></div>
+{% endif %}
+{% if comparisons and not statistic_ids %}
+  <div class="bz-notice bz-notice--info"><span class="bz-notice__sign" aria-hidden="true">i</span><p>Noch kein Zähler aus Home Assistant zugeordnet. Unter <a class="bz-link" href="{{ base }}/settings">HA-Statistiken</a> stehen die verfügbaren Zähler; eingetragen werden sie in der Konfiguration der App.</p></div>
+{% endif %}
+
+<section class="bz-section" aria-labelledby="compare-title">
+  <div class="bz-section-head">
+    <h2 class="bz-title" id="compare-title">Rechnung gegenüber Messung</h2>
+  </div>
   {% if comparisons %}
-    <table>
-      <tr>
-        <th>Medium</th><th>Zeitraum</th><th class="num">Rechnung</th><th class="num">Home Assistant</th>
-        <th class="num">Abweichung</th><th class="num">Kosten laut Rechnung</th><th class="num">Preis je Einheit</th>
-        <th class="num">Abbuchungen im Zeitraum</th>
-      </tr>
+    <div class="bz-grid">
       {% for row in comparisons %}
         {% set e = row.entry %}
-        <tr>
-          <td>{{ media[e.medium] }}</td>
-          <td>{{ e.period_start | de_date }} – {{ e.period_end | de_date }}</td>
-          <td class="num">{{ e.value | de_number }} {{ e.unit }}</td>
-          <td class="num">
-            {% if row.ha and row.ha.change is not none %}{{ row.ha.change | de_number }} {{ row.ha.unit or '' }}
-              {% if not row.ha.covered %}<br><span class="muted">HA misst erst seit diesem Zeitraum, Wert unvollständig</span>{% endif %}
-            {% elif statistic_ids.get(e.medium) %}<span class="muted">keine Daten</span>
-            {% else %}<span class="muted">nicht zugeordnet</span>{% endif %}
-          </td>
-          <td class="num">
-            {% if row.deviation is not none %}
-              <span class="{{ 'good' if row.deviation | abs < 5 else 'bad' }}">{{ row.deviation | de_number(1) }} %</span>
+        <article class="bz-card">
+          <div class="bz-card__head">
+            {% set first_year, last_year = e.period_start[:4], e.period_end[:4] %}
+            <h3 class="bz-title">{{ media[e.medium] }} {{ last_year if first_year == last_year else first_year ~ "/" ~ last_year[2:] }}</h3>
+            {{ medium_chip(e.medium) }}
+          </div>
+          <div class="bz-card__period">Abrechnungszeitraum {{ period(e) }}</div>
+          <div class="bz-compare">
+            <div>
+              <div class="bz-label">Laut Rechnung</div>
+              <div class="bz-compare__value">{{ e.value | de_number }}<span class="bz-unit">{{ e.unit }}</span></div>
+            </div>
+            <div>
+              <div class="bz-label">Gemessen</div>
+              {% if row.ha and row.ha.change is not none %}
+                <div class="bz-compare__value">{{ row.ha.change | de_number }}<span class="bz-unit">{{ row.ha.unit or '' }}</span></div>
+              {% else %}
+                <div class="bz-compare__value bz-compare__value--missing">keine Messung</div>
+              {% endif %}
+            </div>
+          </div>
+          <div class="bz-card__verdict">
+            {% if row.status %}
+              {{ status_pill(row.status, row.status_label) }}
+              {% if row.verdict %}<span>{{ row.verdict }}</span>{% endif %}
+            {% elif not statistic_ids.get(e.medium) %}
+              <span class="bz-muted">Kein Zähler aus Home Assistant zugeordnet.</span>
+            {% else %}
+              <span class="bz-muted">Keine Messung abrufbar, der Hinweis oben sagt warum.</span>
             {% endif %}
-          </td>
-          <td class="num">
-            {% if row.billed %}{{ row.billed | de_money }} €{% endif %}
-            {% if row.billed_count > 1 %}<br><span class="bad">Summe aus {{ row.billed_count }} Beträgen, bitte prüfen</span>{% endif %}
-          </td>
-          <td class="num">{% if row.price %}{{ row.price | de_number(4) }} €/{{ e.unit }}{% endif %}</td>
-          <td class="num">{% if row.debited %}{{ row.debited | de_money }} €{% endif %}</td>
-        </tr>
+          </div>
+          {% if row.billed or row.debited %}
+            <div class="bz-card__foot">
+              {% if row.billed %}<span>Kosten <strong>{{ row.billed | de_money }} €</strong></span>{% endif %}
+              {% if row.price %}<span>Preis <strong>{{ row.price | de_number(4) }} €/{{ e.unit }}</strong></span>{% endif %}
+              {% if row.debited %}<span>Abbuchungen <strong>{{ row.debited | de_money }} €</strong></span>{% endif %}
+            </div>
+          {% endif %}
+          {% if row.billed_count > 1 %}
+            <div class="bz-notice bz-notice--warn"><span class="bz-notice__sign" aria-hidden="true">!</span><p>Die Kosten sind die Summe aus {{ row.billed_count }} Beträgen mit demselben Zeitraum. Prüfe, ob einer doppelt erfasst ist.</p></div>
+          {% endif %}
+        </article>
       {% endfor %}
-    </table>
+    </div>
   {% else %}
-    <p class="muted">Noch kein Verbrauch erfasst. Lade eine Rechnung hoch oder erfasse einen Eintrag von Hand.</p>
+    <p class="bz-empty">Noch kein Verbrauch erfasst. <a class="bz-link" href="{{ base }}/upload">Lade eine Rechnung hoch</a> oder <a class="bz-link" href="{{ base }}/entries/new">erfasse einen Eintrag von Hand</a>.</p>
   {% endif %}
 </section>
 
-<section>
-  <h2>Alle Einträge</h2>
-  {% if entries %}{{ entries_table(entries, kinds, media, base) }}{% else %}<p class="muted">Keine Einträge.</p>{% endif %}
+<section class="bz-section" aria-labelledby="entries-title">
+  <div class="bz-section-head">
+    <h2 class="bz-title" id="entries-title">Alle Einträge</h2>
+    <a class="bz-btn bz-btn--quiet" href="{{ base }}/entries/new">Eintrag erfassen</a>
+  </div>
+  {% if entries %}{{ entries_table(entries) }}{% else %}<p class="bz-empty">Noch keine Einträge.</p>{% endif %}
 </section>
 
-<section>
-  <h2>Dokumente</h2>
+<section class="bz-section" aria-labelledby="documents-title">
+  <div class="bz-section-head">
+    <h2 class="bz-title" id="documents-title">Dokumente</h2>
+    <a class="bz-btn bz-btn--quiet" href="{{ base }}/upload">PDF hochladen</a>
+  </div>
   {% if documents %}
-    <table>
-      <tr><th>Datei</th><th>Hochgeladen</th><th class="num">Seiten</th><th class="num">Einträge</th></tr>
-      {% for d in documents %}
-        <tr>
-          <td><a href="{{ base }}/documents/{{ d.id }}">{{ d.filename }}</a></td>
-          <td>{{ d.uploaded_at[:10] | de_date }}{% if d.uploaded_by %} <span class="muted">({{ d.uploaded_by }})</span>{% endif %}</td>
-          <td class="num">{{ d.page_count }}</td>
-          <td class="num">{{ d.entry_count }}</td>
-        </tr>
-      {% endfor %}
-    </table>
+    <div class="bz-ledger-wrap">
+      <table class="bz-ledger">
+        <thead><tr><th>Datei</th><th>Hochgeladen</th><th class="bz-num">Seiten</th><th class="bz-num">Einträge</th></tr></thead>
+        <tbody>
+          {% for d in documents %}
+            <tr>
+              <td data-label="Datei"><a class="bz-link" href="{{ base }}/documents/{{ d.id }}">{{ d.filename }}</a></td>
+              <td data-label="Hochgeladen">{{ d.uploaded_at[:10] | de_date }}{% if d.uploaded_by %} <span class="bz-muted">von {{ d.uploaded_by }}</span>{% endif %}</td>
+              <td data-label="Seiten" class="bz-num">{{ d.page_count }}</td>
+              <td data-label="Einträge" class="bz-num">{{ d.entry_count }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   {% else %}
-    <p class="muted">Noch keine PDFs hochgeladen.</p>
+    <p class="bz-empty">Noch keine PDFs hochgeladen.</p>
   {% endif %}
 </section>
 {% endblock %}

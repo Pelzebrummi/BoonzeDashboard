@@ -1,53 +1,80 @@
+{# Components of the Boonze design system. Import with context: they read base, kinds, media, units and status_labels. #}
+
+{% macro status_pill(key, label=None) %}
+  {%- set sign, default_label = status_labels[key] -%}
+  <span class="bz-status bz-status--{{ key }}"><span class="bz-status__sign" aria-hidden="true">{{ sign }}</span>{{ label or default_label }}</span>
+{%- endmacro %}
+
+{% macro medium_chip(medium) -%}
+  <span class="bz-medium{% if medium != 'sonstiges' %} bz-medium--{{ medium }}{% endif %}">{{ media[medium] }}</span>
+{%- endmacro %}
+
+{% macro period(entry) -%}
+  {% if entry.period_start %}{{ entry.period_start | de_date }} – {% endif %}{{ entry.period_end | de_date }}
+{%- endmacro %}
+
+{% macro amount(value, unit) -%}
+  {% if unit == "EUR" %}{{ value | de_money }} <span class="bz-unit">€</span>{% else %}{{ value | de_number }} <span class="bz-unit">{{ unit }}</span>{% endif %}
+{%- endmacro %}
+
 {# required=False for review rows: unticked empty rows must not block the form; the server validates ticked rows. #}
-{% macro entry_fields(prefix, kinds, media, units, entry=None, required=False) %}
-  <td>
-    <select name="{{ prefix }}kind">
+{% macro entry_fields(prefix, entry=None, required=False) %}
+  <td data-label="Art">
+    <select class="bz-input" name="{{ prefix }}kind" id="{{ prefix }}kind" aria-label="Art">
       {% for key, label in kinds.items() %}
         <option value="{{ key }}" {% if entry and entry.kind == key %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
   </td>
-  <td>
-    <select name="{{ prefix }}medium">
+  <td data-label="Medium">
+    <select class="bz-input" name="{{ prefix }}medium" id="{{ prefix }}medium" aria-label="Medium">
       {% for key, label in media.items() %}
         <option value="{{ key }}" {% if entry and entry.medium == key %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
   </td>
-  <td><input type="date" name="{{ prefix }}period_start" value="{{ entry.period_start.isoformat() if entry and entry.period_start else '' }}"></td>
-  <td><input type="date" name="{{ prefix }}period_end" value="{{ entry.period_end.isoformat() if entry and entry.period_end else '' }}" {% if required %}required{% endif %}></td>
-  <td><input type="text" inputmode="decimal" name="{{ prefix }}value" value="{{ entry.value | de_number if entry else '' }}" {% if required %}required{% endif %}></td>
-  <td>
-    <select name="{{ prefix }}unit">
+  <td data-label="Von"><input class="bz-input" type="date" name="{{ prefix }}period_start" id="{{ prefix }}period_start" aria-label="Zeitraum von" value="{{ entry.period_start.isoformat() if entry and entry.period_start else '' }}"></td>
+  <td data-label="Bis / am"><input class="bz-input" type="date" name="{{ prefix }}period_end" id="{{ prefix }}period_end" aria-label="Zeitraum bis oder Datum" value="{{ entry.period_end.isoformat() if entry and entry.period_end else '' }}" {% if required %}required{% endif %}></td>
+  <td data-label="Wert" class="bz-amount"><input class="bz-input bz-input--figure" type="text" inputmode="decimal" name="{{ prefix }}value" id="{{ prefix }}value" aria-label="Wert" value="{{ entry.value | de_input(entry.unit) if entry else '' }}" {% if required %}required{% endif %}></td>
+  <td data-label="Einheit">
+    <select class="bz-input" name="{{ prefix }}unit" id="{{ prefix }}unit" aria-label="Einheit">
       {% for unit in units %}
         <option {% if entry and entry.unit == unit %}selected{% endif %}>{{ unit }}</option>
       {% endfor %}
     </select>
   </td>
-  <td><input type="text" name="{{ prefix }}note" value="{{ entry.source if entry and entry.source else '' }}"></td>
+  <td data-label="Notiz"><input class="bz-input" type="text" name="{{ prefix }}note" id="{{ prefix }}note" aria-label="Notiz" value="{{ entry.source if entry and entry.source else '' }}"></td>
 {% endmacro %}
 
 {% macro entry_header() %}
-  <th>Art</th><th>Medium</th><th>von</th><th>bis / am</th><th>Wert</th><th>Einheit</th><th>Notiz</th>
+  <th>Art</th><th>Medium</th><th>Von</th><th>Bis / am</th><th class="bz-amount">Wert</th><th>Einheit</th><th>Notiz</th>
 {% endmacro %}
 
-{% macro entries_table(entries, kinds, media, base, next="/") %}
-  <table>
-    <tr><th>Art</th><th>Medium</th><th>Zeitraum</th><th class="num">Wert</th><th>Notiz</th><th></th></tr>
-    {% for e in entries %}
-      <tr>
-        <td>{{ kinds[e.kind] }}</td>
-        <td>{{ media[e.medium] }}</td>
-        <td>{% if e.period_start %}{{ e.period_start | de_date }} – {% endif %}{{ e.period_end | de_date }}</td>
-        <td class="num">{{ (e.value | de_money) if e.unit == 'EUR' else (e.value | de_number) }} {{ e.unit }}</td>
-        <td class="muted">{{ e.note or '' }}</td>
-        <td>
-          <form class="inline" method="post" action="{{ base }}/entries/{{ e.id }}/delete">
-            <input type="hidden" name="next" value="{{ next }}">
-            <button class="link" type="submit">löschen</button>
-          </form>
-        </td>
-      </tr>
-    {% endfor %}
-  </table>
+{% macro entries_table(entries, next="/") %}
+  <div class="bz-ledger-wrap">
+    <table class="bz-ledger">
+      <thead><tr><th>Art</th><th>Medium</th><th>Zeitraum</th><th class="bz-amount">Wert</th><th>Notiz</th><th><span class="bz-sr">Aktion</span></th></tr></thead>
+      <tbody>
+        {% for e in entries %}
+          <tr>
+            <td data-label="Art">{{ kinds[e.kind] }}</td>
+            <td data-label="Medium">{{ medium_chip(e.medium) }}</td>
+            <td data-label="Zeitraum">{{ period(e) }}</td>
+            <td data-label="Wert" class="bz-amount">{{ amount(e.value, e.unit) }}</td>
+            <td data-label="Notiz" class="bz-note">{{ e.note or '' }}</td>
+            <td class="bz-cell-action">
+              {% set what = kinds[e.kind] ~ ", " ~ media[e.medium] ~ ", " ~ period(e) %}
+              <details class="bz-confirm">
+                <summary class="bz-btn bz-btn--danger">Löschen<span class="bz-sr"> – {{ what }}</span></summary>
+                <form class="bz-confirm__body" method="post" action="{{ base }}/entries/{{ e.id }}/delete">
+                  <input type="hidden" name="next" value="{{ next }}">
+                  <button class="bz-btn bz-btn--danger" type="submit">Ja, Eintrag löschen<span class="bz-sr"> – {{ what }}</span></button>
+                </form>
+              </details>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 {% endmacro %}

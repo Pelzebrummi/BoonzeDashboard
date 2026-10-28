@@ -2,56 +2,43 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Energie Dashboard{% endblock %}</title>
-  <style>
-    :root {
-      --bg: #fafafa; --card: #ffffff; --text: #1c1c1c; --muted: #6b6b6b;
-      --border: #e0e0e0; --accent: #03a9f4; --danger: #db4437; --ok: #0f9d58; --warn: #f4b400;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #111111; --card: #1c1c1c; --text: #e1e1e1; --muted: #9b9b9b;
-        --border: #333333; --accent: #4fc3f7; --danger: #ef5350; --ok: #43a047; --warn: #fbc02d;
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}Boonze Dashboard{% endblock %}</title>
+  <script>
+    // Follow Home Assistant's own dark mode, also when it is switched later. The
+    // ingress panel is a same-origin iframe; outside Home Assistant the system
+    // setting applies (CSS media query).
+    (function () {
+      function apply() {
+        try {
+          var ha = window.parent !== window ? window.parent.document.querySelector("home-assistant") : null;
+          var themes = ha && ha.hass ? ha.hass.themes : null;
+          if (themes && typeof themes.darkMode === "boolean") {
+            document.documentElement.dataset.theme = themes.darkMode ? "dark" : "light";
+          }
+        } catch (error) {}
       }
-    }
-    * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
-    a { color: var(--accent); }
-    nav { display: flex; gap: 4px; flex-wrap: wrap; padding: 8px 16px; background: var(--card); border-bottom: 1px solid var(--border); }
-    nav a { padding: 6px 12px; border-radius: 6px; color: var(--text); text-decoration: none; }
-    nav a:hover { background: var(--bg); }
-    nav .user { margin-left: auto; color: var(--muted); padding: 6px 0; }
-    main { max-width: 1100px; margin: 0 auto; padding: 16px; }
-    section { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; overflow-x: auto; }
-    h1 { font-size: 1.4rem; margin: 0 0 12px; }
-    h2 { font-size: 1.1rem; margin: 0 0 12px; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
-    th { color: var(--muted); font-weight: 600; font-size: 0.85rem; }
-    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-    input, select, button { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; }
-    input[type="text"] { width: 100%; min-width: 80px; }
-    button, .button { background: var(--accent); color: #fff; border: 0; padding: 8px 14px; cursor: pointer; border-radius: 6px; text-decoration: none; display: inline-block; }
-    button.link { background: none; color: var(--danger); padding: 0; }
-    .muted { color: var(--muted); }
-    .error { border-color: var(--danger); }
-    .notice { border-color: var(--warn); }
-    .good { color: var(--ok); }
-    .bad { color: var(--danger); }
-    pre { white-space: pre-wrap; font-size: 0.8rem; max-height: 480px; overflow: auto; }
-    form.inline { display: inline; }
-  </style>
+      apply();
+      try {
+        // Home Assistant restyles its root element when the theme changes.
+        if (window.parent !== window) {
+          new MutationObserver(apply).observe(window.parent.document.documentElement, { attributes: true });
+        }
+        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", apply);
+      } catch (error) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="{{ base }}/static/boonze.css?v={{ asset_version }}">
 </head>
 <body>
-  <nav>
-    <a href="{{ base }}/">Übersicht</a>
-    <a href="{{ base }}/upload">PDF hochladen</a>
-    <a href="{{ base }}/entries/new">Eintrag erfassen</a>
-    <a href="{{ base }}/settings">HA-Statistiken</a>
-    {% if user %}<span class="user">{{ user }}</span>{% endif %}
+  <nav class="bz-nav" aria-label="Bereiche">
+    <a href="{{ base }}/"{% if nav == "overview" %} aria-current="{{ nav_current }}"{% endif %}>Übersicht</a>
+    <a href="{{ base }}/upload"{% if nav == "upload" %} aria-current="{{ nav_current }}"{% endif %}>PDF hochladen</a>
+    <a href="{{ base }}/entries/new"{% if nav == "entry" %} aria-current="{{ nav_current }}"{% endif %}>Eintrag erfassen</a>
+    <a href="{{ base }}/settings"{% if nav == "settings" %} aria-current="{{ nav_current }}"{% endif %}>HA-Statistiken</a>
+    {% if user %}<span class="bz-nav__user">{{ user }}</span>{% endif %}
   </nav>
-  <main>
+  <main class="bz-page">
     {% block content %}{% endblock %}
   </main>
 </body>

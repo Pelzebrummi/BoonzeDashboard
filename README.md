@@ -108,6 +108,21 @@ und `HA_TOKEN=<langlebiges Zugriffstoken>` setzen. Die Zuordnung der
 Statistiken steht dann in `./data/options.json`, z. B.
 `{"strom_statistic_id": "sensor.stromzaehler"}`.
 
+## Design
+
+- **Design System:** Farben, Schriften, Abstände, Komponenten und
+  Sprachregeln stehen im Design System „Boonze Dashboard“:
+  https://claude.ai/artifact/8PV9NmjEZAHoWUoowAVJUr. Neue Seiten bauen aus
+  dessen Komponenten (Klassen `bz-…`).
+- **Umsetzung in der App:** `app/static/boonze.css`. Die Token-Werte dort
+  müssen mit `tokens.json` im Design System übereinstimmen. Ändert sich eine
+  Farbe, an beiden Stellen ändern.
+- **Schriften:** liegen in `app/static/fonts` (Atkinson Hyperlegible Next und
+  Mono, Bricolage Grotesque, SIL Open Font License) und werden nicht von
+  Google geladen. Das Dashboard sieht also auch ohne Internet gleich aus.
+- **Hell und dunkel:** Das Dashboard folgt dem Dunkelmodus von Home
+  Assistant, außerhalb von HA der Systemeinstellung.
+
 ## Worauf man beim Entwickeln achten muss
 
 - **Pfade immer mit `base`:** Die App läuft unter

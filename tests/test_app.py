@@ -61,7 +61,7 @@ def test_upload_review_and_save(client):
     # Unticked empty rows must not block submitting the form in the browser.
     assert "required" not in page.text
     assert 'value="2111"' in page.text
-    assert 'value="812,4"' in page.text
+    assert 'value="812,40"' in page.text
 
     response = save_rows(client, document_id, [CONSUMPTION])
     assert response.status_code == 303
@@ -114,13 +114,14 @@ def test_delete_entry_only_redirects_inside_the_app(client):
     assert response.headers["location"] == f"{BASE}/"
 
 
-def ha_statistics(covered: bool = True):
+def ha_statistics(covered: bool = True, change: float | None = 2000.0, unit: str | None = "Wh"):
     def respond(command):
         match command["type"]:
             case "recorder/get_statistics_metadata":
-                return [{"statistic_id": "sensor.strom", "unit_class": "energy", "statistics_unit_of_measurement": "Wh"}]
+                unit_class = "energy" if unit == "Wh" else None
+                return [{"statistic_id": "sensor.strom", "unit_class": unit_class, "statistics_unit_of_measurement": unit}]
             case "recorder/statistic_during_period":
-                return {"change": 2000.0}
+                return {"change": change}
             case "recorder/statistics_during_period":
                 return {"sensor.strom": [{"sum": 1.0}]} if covered else {}
         raise AssertionError(command)
@@ -139,9 +140,12 @@ def test_overview_compares_with_home_assistant(settings):
             )
             page = client.get("/")
 
-    assert "2000 kWh" in page.text
-    assert "-5,3 %" in page.text
+    assert '2.000<span class="bz-unit">kWh</span>' in page.text
+    assert "5,3 % weniger gemessen als abgerechnet" in page.text
+    # 5,3 % lies between the "passt" (5 %) and "weicht ab" (15 %) thresholds.
+    assert "bz-status--warn" in page.text
     assert "812,40 €" in page.text
+    assert "0,3848 €/kWh" in page.text
     [query] = [c for c in received if c["type"] == "recorder/statistic_during_period"]
     assert query["statistic_id"] == "sensor.strom"
     assert query["fixed_period"] == {
@@ -156,8 +160,9 @@ def test_no_deviation_when_ha_data_starts_inside_the_period(settings):
         with TestClient(create_app(connected), headers=INGRESS) as client:
             client.post("/entries", data={**CONSUMPTION})
             page = client.get("/")
-    assert "Wert unvollständig" in page.text
-    assert " %</span>" not in page.text
+    assert "nicht vollständig gemessen" in page.text
+    assert "bz-status--none" in page.text
+    assert "% weniger" not in page.text
 
 
 def test_invalid_numbers_are_rejected(client):
@@ -180,6 +185,23 @@ def test_malformed_requests_show_the_error_page(client):
     assert "Ungültige Anfrage" in response.text
 
 
+def test_stylesheet_and_fonts_are_served(client):
+    page = client.get("/")
+    assert f'href="{BASE}/static/boonze.css?v=' in page.text
+    css = client.get("/static/boonze.css")
+    assert css.status_code == 200
+    assert "--tinte" in css.text
+    font = client.get("/static/fonts/atkinson-hyperlegible-next-latin.woff2")
+    assert font.status_code == 200
+    assert font.content[:4] == b"wOF2"
+
+
+def test_navigation_marks_the_current_page(client):
+    assert '/upload" aria-current="page"' in client.get("/upload").text
+    assert '/settings" aria-current="page"' in client.get("/settings").text
+    assert f'href="{BASE}/" aria-current="page"' in client.get("/").text
+
+
 def test_wrong_token_shows_an_error_instead_of_crashing(settings):
     with fake_home_assistant(lambda command: None) as (url, _):
         connected = replace(settings, ha_ws_url=url, ha_token="falsch", statistic_ids={"strom": "sensor.strom"})
@@ -188,3 +210,45 @@ def test_wrong_token_shows_an_error_instead_of_crashing(settings):
             page = client.get("/")
     assert page.status_code == 200
     assert "Anmeldung bei Home Assistant fehlgeschlagen" in page.text
+
+
+def overview_with_ha(settings, **statistics):
+    with fake_home_assistant(ha_statistics(**statistics)) as (url, _):
+        connected = replace(settings, ha_ws_url=url, ha_token="secret", statistic_ids={"strom": "sensor.strom"})
+        with TestClient(create_app(connected), headers=INGRESS) as client:
+            client.post("/entries", data={**CONSUMPTION})
+            return client.get("/").text
+
+
+def test_missing_measurement_says_so(settings):
+    page = overview_with_ha(settings, change=None)
+    assert "bz-compare__value--missing\">keine Messung" in page
+    assert "keine Werte" in page
+
+
+def test_statistic_without_unit_is_not_compared(settings):
+    page = overview_with_ha(settings, unit=None)
+    assert "nennt keine Einheit" in page
+    assert "None" not in page
+
+
+def test_amount_must_be_in_euro(client):
+    response = client.post("/entries", data={**CONSUMPTION, "kind": "betrag"})
+    assert response.status_code == 400
+    assert "Ein Betrag steht in EUR" in response.text
+
+
+def test_unknown_page_has_a_german_error(client):
+    response = client.get("/gibt-es-nicht")
+    assert response.status_code == 404
+    assert "Diese Seite gibt es nicht." in response.text
+    assert "Not Found" not in response.text
+
+
+def test_document_page_marks_overview_as_section_not_page(client):
+    location = upload(client, make_pdf(SAMPLE_BILL)).headers["location"]
+    page = client.get(location.removeprefix(BASE)).text
+    assert f'href="{BASE}/" aria-current="true"' in page
+    # Deleting asks first on the page itself.
+    assert '<details class="bz-confirm">' in page
+    assert "Ja, Dokument endgültig löschen" in page

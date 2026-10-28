@@ -12,6 +12,7 @@ RUN pip install -r requirements.txt
 COPY app ./app
 
 ARG BUILD_VERSION=dev
+ENV APP_VERSION=${BUILD_VERSION}
 LABEL io.hass.version="${BUILD_VERSION}" \
       io.hass.arch="amd64"
 

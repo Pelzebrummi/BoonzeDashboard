@@ -1,40 +1,52 @@
 {% extends "base.html" %}
+{% from "_macros.html" import medium_chip with context %}
+{% block title %}HA-Statistiken – Boonze Dashboard{% endblock %}
 {% block content %}
-<h1>HA-Statistiken</h1>
+<header class="bz-page-head">
+  <h1 class="bz-display">HA-Statistiken</h1>
+  <p class="bz-empty">Welche Zähler aus Home Assistant mit den Rechnungen verglichen werden.</p>
+</header>
 
-<section>
-  <h2>Zugeordnet</h2>
+<section class="bz-section" aria-labelledby="assigned-title">
+  <h2 class="bz-title" id="assigned-title">Zugeordnet</h2>
   {% if statistic_ids %}
-    <table>
-      {% for medium, statistic_id in statistic_ids.items() %}
-        <tr><td>{{ media[medium] }}</td><td><code>{{ statistic_id }}</code></td></tr>
-      {% endfor %}
-    </table>
+    <div class="bz-ledger-wrap">
+      <table class="bz-ledger">
+        <thead><tr><th>Medium</th><th>Statistik</th></tr></thead>
+        <tbody>
+          {% for medium, statistic_id in statistic_ids.items() %}
+            <tr><td data-label="Medium">{{ medium_chip(medium) }}</td><td data-label="Statistik"><code>{{ statistic_id }}</code></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   {% else %}
-    <p class="muted">Noch nichts zugeordnet.</p>
+    <p class="bz-empty">Noch nichts zugeordnet.</p>
   {% endif %}
-  <p class="muted">
-    Ändern unter Einstellungen → Apps → Energie Dashboard → Konfiguration, danach die App neu starten.
-  </p>
+  <p class="bz-empty bz-small">Ändern unter Einstellungen → Apps → Energie Dashboard → Konfiguration, danach die App neu starten.</p>
 </section>
 
-<section>
-  <h2>Verfügbare Zähler-Statistiken in Home Assistant</h2>
+<section class="bz-section" aria-labelledby="available-title">
+  <h2 class="bz-title" id="available-title">Verfügbare Zähler in Home Assistant</h2>
   {% if ha_error %}
-    <p class="bad">{{ ha_error }}</p>
+    <div class="bz-notice bz-notice--error"><span class="bz-notice__sign" aria-hidden="true">×</span><p>{{ ha_error }}</p></div>
   {% elif available %}
-    <table>
-      <tr><th>Statistik-ID</th><th>Name</th><th>Einheit</th></tr>
-      {% for s in available %}
-        <tr>
-          <td><code>{{ s.statistic_id }}</code></td>
-          <td>{{ s.name or '' }}</td>
-          <td>{{ s.statistics_unit_of_measurement or '' }}</td>
-        </tr>
-      {% endfor %}
-    </table>
+    <div class="bz-ledger-wrap">
+      <table class="bz-ledger">
+        <thead><tr><th>Statistik-ID</th><th>Name</th><th>Einheit</th></tr></thead>
+        <tbody>
+          {% for s in available %}
+            <tr>
+              <td data-label="Statistik-ID"><code>{{ s.statistic_id }}</code></td>
+              <td data-label="Name">{{ s.name or '' }}</td>
+              <td data-label="Einheit" class="bz-muted">{{ s.statistics_unit_of_measurement or '' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   {% else %}
-    <p class="muted">Home Assistant meldet keine Statistiken mit Summe. Zähler-Sensoren brauchen <code>state_class: total_increasing</code> oder <code>total</code>.</p>
+    <p class="bz-empty">Home Assistant meldet noch keine Zähler mit Summe. Zähler-Sensoren brauchen <code>state_class: total_increasing</code> oder <code>total</code>.</p>
   {% endif %}
 </section>
 {% endblock %}

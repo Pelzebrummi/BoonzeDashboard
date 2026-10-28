@@ -1,8 +1,12 @@
 {% extends "base.html" %}
+{% block title %}Fehler – Boonze Dashboard{% endblock %}
 {% block content %}
-<h1>Das hat nicht geklappt</h1>
-<section class="error">
-  <p>{{ message }}</p>
-  <p><a href="javascript:history.back()">Zurück</a> · <a href="{{ base }}/">Zur Übersicht</a></p>
-</section>
+<header class="bz-page-head">
+  <h1 class="bz-display">Das hat nicht geklappt</h1>
+</header>
+<div class="bz-notice bz-notice--error"><span class="bz-notice__sign" aria-hidden="true">×</span><p>{{ message }}</p></div>
+<div class="bz-actions">
+  <a class="bz-btn" href="javascript:history.back()">Zurück</a>
+  <a class="bz-btn bz-btn--quiet" href="{{ base }}/">Zur Übersicht</a>
+</div>
 {% endblock %}

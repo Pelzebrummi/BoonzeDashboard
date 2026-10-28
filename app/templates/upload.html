@@ -1,15 +1,14 @@
 {% extends "base.html" %}
+{% block title %}PDF hochladen – Boonze Dashboard{% endblock %}
 {% block content %}
-<h1>PDF hochladen</h1>
-<section>
-  <form method="post" action="{{ base }}/upload" enctype="multipart/form-data">
-    <p><input type="file" name="file" accept="application/pdf,.pdf" required></p>
-    <p class="muted">
-      Rechnungen, Abschlagspläne oder Zählerstands-Mitteilungen als PDF, höchstens {{ max_upload_mb }} MB.
-      Die Werte werden danach vorgeschlagen und vor dem Speichern geprüft.
-      Kontobewegungen lassen sich zuverlässiger als CSV-Export aus dem Online-Banking übernehmen als aus einem Kontoauszug-PDF.
-    </p>
-    <button type="submit">Hochladen</button>
-  </form>
-</section>
+<header class="bz-page-head">
+  <h1 class="bz-display">PDF hochladen</h1>
+</header>
+<form class="bz-upload" method="post" action="{{ base }}/upload" enctype="multipart/form-data">
+  <p class="bz-upload__title">Rechnung als PDF hochladen</p>
+  <p class="bz-muted">Jahresabrechnung, Abschlagsplan oder Zählerstand-Mitteilung, höchstens {{ max_upload_mb }} MB. Die Werte werden vorgeschlagen und von dir geprüft, bevor sie gespeichert werden.</p>
+  <input type="file" id="file" name="file" accept="application/pdf,.pdf" required aria-label="PDF-Datei">
+  <button class="bz-btn bz-btn--primary" type="submit">Hochladen</button>
+</form>
+<p class="bz-empty bz-small">Abbuchungen vom Konto lassen sich zuverlässiger aus dem CSV-Export des Online-Bankings übernehmen als aus einem Kontoauszug-PDF.</p>
 {% endblock %}
