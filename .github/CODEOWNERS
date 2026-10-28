@@ -1,0 +1,13 @@
+# The main ruleset requires a code owner review for these paths. Everything
+# else (app code, tests, docs) can be merged by the boonze bot once CI is green.
+#
+# - .github/: CI, Dependabot and this file
+# - scripts/: runs in the deploy job, which holds the ha-app deploy key and a
+#   packages:write token
+# - ha-app/: the app definition Home Assistant installs, including the app's
+#   permissions on the Home Assistant host
+# - Dockerfile: base image and build steps of the released image
+/.github/   @Pelzebrummi
+/scripts/   @Pelzebrummi
+/ha-app/    @Pelzebrummi
+/Dockerfile @Pelzebrummi
