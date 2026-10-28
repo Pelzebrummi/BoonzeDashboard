@@ -1,5 +1,5 @@
 # Änderungen
 
-## 2026.10.28.2
+## 2026.10.28.3
 
-- Rename the sidebar entry to "Boonze Dashboard" (80824e1)
+- Document HA quirks seen during the first install (e74319a)
