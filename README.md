@@ -152,3 +152,4 @@ Statistiken steht dann in `./data/options.json`, z. B.
   nächste sinnvolle Ausbauschritt.
 - **Uploads:** Uploads laufen per POST mit `ingress_stream: true`. Ohne diese
   Option puffert der Supervisor die Anfrage und bricht bei 16 MiB ab.
+
