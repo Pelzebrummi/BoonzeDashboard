@@ -1,5 +1,5 @@
 # Änderungen
 
-## 2026.10.28.3
+## 2026.10.28.4
 
-- Document HA quirks seen during the first install (e74319a)
+- Manuell gestartet (e74319a)
