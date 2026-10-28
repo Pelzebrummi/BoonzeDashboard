@@ -1,0 +1,13 @@
+configuration:
+  strom_statistic_id:
+    name: Electricity statistic
+    description: Statistic ID of the electricity meter in Home Assistant, e.g. sensor.electricity_meter_import. The dashboard's "HA-Statistiken" page lists the available IDs.
+  gas_statistic_id:
+    name: Gas statistic
+    description: Statistic ID of the gas meter in Home Assistant.
+  wasser_statistic_id:
+    name: Water statistic
+    description: Statistic ID of the water meter in Home Assistant.
+  max_upload_mb:
+    name: Maximum PDF size (MB)
+    description: Larger files are rejected.
