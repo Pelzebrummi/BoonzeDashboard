@@ -1,11 +1,11 @@
-# Template. scripts/publish-ha-app.sh fills in 2026.10.28.5, ghcr.io/pelzebrummi/boonzedashboard and
+# Template. scripts/publish-ha-app.sh fills in 2026.10.28.6, ghcr.io/pelzebrummi/boonzedashboard and
 # https://github.com/Pelzebrummi/BoonzeDashboard and publishes the result on the ha-app branch.
 #
 # Do not change `slug` (or the repository URL / branch) once the app is
 # installed: Home Assistant would treat it as a different app with an empty
 # /data, and the update entity used by the deploy automation would change.
 name: Energie Dashboard
-version: "2026.10.28.5"
+version: "2026.10.28.6"
 slug: energie_dashboard
 description: Rechnungen und Zählerstände aus PDFs mit dem Verbrauch in Home Assistant vergleichen
 url: https://github.com/Pelzebrummi/BoonzeDashboard

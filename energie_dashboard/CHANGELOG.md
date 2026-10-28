@@ -1,5 +1,5 @@
 # Änderungen
 
-## 2026.10.28.5
+## 2026.10.28.6
 
-- Apply the Boonze design system to the dashboard (710e55f)
+- Publish ha-app with a deploy key (ffe886c)
