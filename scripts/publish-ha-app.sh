@@ -49,3 +49,4 @@ git -C "$worktree" \
   commit --quiet -m "Release $version"
 git -C "$worktree" push origin "HEAD:refs/heads/$branch"
 git worktree remove --force "$worktree"
+# Schutztest
