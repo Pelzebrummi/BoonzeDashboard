@@ -20,7 +20,8 @@ ingress_port: 8099
 # (which limits buffered bodies to 16 MiB).
 ingress_stream: true
 panel_icon: mdi:file-chart-outline
-panel_title: Energie
+# Not "Energie": that is the title of Home Assistant's built-in energy dashboard.
+panel_title: Boonze Dashboard
 panel_admin: true
 homeassistant_api: true
 # Used once "Watchdog" is switched on in the app's Info tab (off by default):
