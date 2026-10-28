@@ -1,5 +1,5 @@
 # Änderungen
 
-## 2026.10.28.4
+## 2026.10.28.5
 
-- Manuell gestartet (e74319a)
+- Apply the Boonze design system to the dashboard (710e55f)
