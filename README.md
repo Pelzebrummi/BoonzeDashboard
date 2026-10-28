@@ -70,6 +70,10 @@ hält HA die App für eine neue App, und deren Datenordner ist leer.
    *Info* **Watchdog** und *In der Seitenleiste anzeigen* einschalten, dann
    starten. Mit dem Watchdog startet der Supervisor die App neu, wenn sie
    abstürzt oder nicht mehr antwortet.
+   Danach Home Assistant einmal neu starten (Einstellungen → System → ⏻ →
+   Home Assistant neu starten). Erst dann legt HA die Update-Entität
+   `update.energie_dashboard_update` an; vorher erscheinen keine Updates und
+   die Automation greift nicht (beobachtet mit HA 2026.10.4).
 3. **Statistiken zuordnen:** Im Dashboard unter **HA-Statistiken** die IDs der
    Zähler nachsehen. Unter Konfiguration bei Strom, Gas und Wasser eintragen,
    dann die App neu starten.
@@ -109,6 +113,10 @@ Statistiken steht dann in `./data/options.json`, z. B.
 - **Pfade immer mit `base`:** Die App läuft unter
   `/api/hassio_ingress/<token>/`. Links, Formular-Ziele und Redirects deshalb
   immer mit `{{ base }}` bzw. `redirect()` bauen, nie mit einem nackten `/`.
+- **Titel in der Seitenleiste ändern:** Ein geänderter `panel_title` in
+  `ha-app/energie_dashboard/config.yaml` erscheint erst, wenn man nach dem
+  Update in der App „In Seitenleiste anzeigen“ einmal aus- und wieder
+  einschaltet.
 - **Keine Pfade in Query-Parametern:** Der Supervisor blockt Anfragen mit
   Mustern wie `?next=/irgendwas` (HTTP 400). Pfade gehören in Formularfelder.
 - **Datenbank:** Schemaänderungen nur als neue Migration am Ende von
