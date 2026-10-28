@@ -73,7 +73,12 @@ jobs:
       contents: write
       packages: write
     steps:
+      # Fetch and push with a deploy key: the ha-app ruleset lets only deploy
+      # keys (and the repository admin) update that branch, so no other token
+      # with contents:write can publish a release past the tests.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ssh-key: ${{ secrets.HA_APP_DEPLOY_KEY }}
 
       - name: Version and image name
         id: meta
