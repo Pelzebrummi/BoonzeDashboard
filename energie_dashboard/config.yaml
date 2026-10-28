@@ -1,11 +1,11 @@
-# Template. scripts/publish-ha-app.sh fills in 2026.10.28.1, ghcr.io/pelzebrummi/boonzedashboard and
+# Template. scripts/publish-ha-app.sh fills in 2026.10.28.2, ghcr.io/pelzebrummi/boonzedashboard and
 # https://github.com/Pelzebrummi/BoonzeDashboard and publishes the result on the ha-app branch.
 #
 # Do not change `slug` (or the repository URL / branch) once the app is
 # installed: Home Assistant would treat it as a different app with an empty
 # /data, and the update entity used by the deploy automation would change.
 name: Energie Dashboard
-version: "2026.10.28.1"
+version: "2026.10.28.2"
 slug: energie_dashboard
 description: Rechnungen und Zählerstände aus PDFs mit dem Verbrauch in Home Assistant vergleichen
 url: https://github.com/Pelzebrummi/BoonzeDashboard
@@ -20,7 +20,8 @@ ingress_port: 8099
 # (which limits buffered bodies to 16 MiB).
 ingress_stream: true
 panel_icon: mdi:file-chart-outline
-panel_title: Energie
+# Not "Energie": that is the title of Home Assistant's built-in energy dashboard.
+panel_title: Boonze Dashboard
 panel_admin: true
 homeassistant_api: true
 # Used once "Watchdog" is switched on in the app's Info tab (off by default):
