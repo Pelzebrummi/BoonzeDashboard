@@ -97,6 +97,12 @@ py -3.13 -m venv .venv
 .venv/Scripts/python -m pytest -q
 ```
 
+Nur die Parser-Tests ausführen (bei aktivierter Python-Umgebung):
+
+```bash
+pytest tests/test_parsing.py
+```
+
 Starten ohne Home Assistant (Daten landen in `./data`):
 
 ```bash
